@@ -12,7 +12,7 @@ import json, math, os, random, datetime as dt
 
 IN = os.environ.get("MAKEFUN_INPUT_DIR", "/input")
 OUT = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
-P_STAY, P_NEI = 0.25, 0.05          # anchor mass on last chart order
+P_STAY, P_NEI = 0.25, 0.08          # anchor mass on last chart order
 SIZE_SD = 0.35
 MICRO = 1_000_000
 RNG_SEED = 20261112  # deterministic across runs
@@ -71,14 +71,14 @@ def main():
         # blend simulation counts with the analytic anchor (anchor keeps floor)
         blended = {}
         for mn, c in place_counts[p].items():
-            blended[mn] = blended.get(mn, 0.0) + (c / tot) * (1.0 - 0.65)
+            blended[mn] = blended.get(mn, 0.0) + (c / tot) * (1.0 - 0.55)
         for mn, a in anchor[p].items():
-            blended[mn] = blended.get(mn, 0.0) + a * 0.65
+            blended[mn] = blended.get(mn, 0.0) + a * 0.55
         rows = sorted(blended.items(), key=lambda kv: -kv[1])
         acc = 0.0
         for mn, q in rows:
-            if acc >= 0.97: break
-            qq = min(q, 0.97 - acc)
+            if acc >= 0.99: break
+            qq = min(q, 0.99 - acc)
             if qq <= 0: break
             probabilities.append({"mint": mn, "place": p, "p": round(qq, 6)})
             acc += qq
