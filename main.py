@@ -13,7 +13,7 @@ import json, math, os, random, datetime as dt
 IN = os.environ.get("MAKEFUN_INPUT_DIR", "/input")
 OUT = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
 P_STAY, P_NEI = 0.25, 0.05          # anchor mass on last chart order
-SIZE_SD = 0.30
+SIZE_SD = 0.35
 MICRO = 1_000_000
 RNG_SEED = 20261112  # deterministic across runs
 
@@ -89,7 +89,7 @@ def main():
         if not arr: continue
         mean = sum(arr) / len(arr)
         var = sum((x - mean) ** 2 for x in arr) / max(len(arr) - 1, 1)
-        sd = max(math.sqrt(var), 0.30)
+        sd = max(math.sqrt(var), 0.15)
         def cdf(x):
             if x == float("inf"): return 1.0
             if x == float("-inf"): return 0.0
