@@ -13,7 +13,7 @@ import json, math, os, random, datetime as dt
 IN = os.environ.get("MAKEFUN_INPUT_DIR", "/input")
 OUT = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
 P_STAY, P_NEI = 0.25, 0.05          # anchor mass on last chart order
-SIZE_SD = 0.40
+SIZE_SD = 0.30
 MICRO = 1_000_000
 RNG_SEED = 20261112  # deterministic across runs
 
