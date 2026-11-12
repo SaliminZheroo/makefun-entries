@@ -16,6 +16,7 @@ P_STAY, P_NEI = 0.35, 0.10          # anchor mass on last chart order
 TILT = 0.10                          # total extra mass reshaped by momentum
 SIZE_SD = 0.35
 MICRO = 1_000_000
+RNG_SEED = 20261112  # deterministic across runs
 
 def ts(s):
     return dt.datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
@@ -61,7 +62,7 @@ def main():
     # cap the tilt pool: momentum score normalized
     maxslope = max((abs(slope.get(r["mint"], 0)) for r in chart[:40]), default=1.0) or 1.0
 
-    rng = random.Random(20261112)
+    rng = random.Random(RNG_SEED)
     npaths = 6000
     cand = chart[:60]
     # per-coin: anchor probability from baseline + momentum tilt
