@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
-"""pumpfun-top5-forecast-01 entry (v2): persistence-anchored forecaster.
+"""pumpfun-top5-forecast-01 entry (v3): persistence-anchored forecaster.
 
-Pump.fun top-of-chart churn is extreme; the strongest signal over a 1-6h
-horizon is the last mark's order (house baseline), so we anchor on it and add
-a small momentum tilt: coins with strong positive weighted drift earn extra
-probability, coins fading lose some. Monte-Carlo over per-coin drift+diffusion
-provides place probabilities; sizes use per-place projected cap with sd from
-the observed dispersion of the chart (house-like 0.35 when data is thin).
+Pump.fun top-of-chart churn is extreme; the strongest signal over a 0-1h
+horizon is the last mark's chart order, so we anchor a large probability mass
+on it (rank k keeps most of its mass, a little spills to neighbors) and add
+diffusion: Monte-Carlo log-cap random walks (sd calibrated to the dev
+history's 10-minute moves, scaled by sqrt(hours)) give per-place place and
+size probabilities. Deterministic via fixed RNG seed.
 """
 import json, math, os, random, datetime as dt
 
 IN = os.environ.get("MAKEFUN_INPUT_DIR", "/input")
 OUT = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
-P_STAY, P_NEI = 0.35, 0.10          # anchor mass on last chart order
-TILT = 0.10                          # total extra mass reshaped by momentum
-SIZE_SD = 0.35
+P_STAY, P_NEI = 0.25, 0.05          # anchor mass on last chart order
+SIZE_SD = 0.40
 MICRO = 1_000_000
 RNG_SEED = 20261112  # deterministic across runs
 
@@ -36,86 +35,35 @@ def main():
     t_last = ts(last["at"])
     reads = [ts(r) for r in task["reads"]]
 
-    # per-coin recent slope (log10 cap per hour, weighted to recent marks)
-    series = {}
-    for i, m in enumerate(marks):
-        for r in m["rows"]:
-            cap = float(r["market_cap_lamports"])
-            if cap > 0:
-                series.setdefault(r["mint"], []).append((ts(m["at"]), math.log10(cap) - 9.0))
-    slope = {}
-    for mn, s in series.items():
-        s = sorted(s)
-        pts = s[-4:]
-        if len(pts) < 2:
-            slope[mn] = 0.0
-        else:
-            # robust: median of pairwise slopes
-            gs = []
-            for a in range(len(pts)):
-                for b in range(a + 1, len(pts)):
-                    dtv = pts[b][0] - pts[a][0]
-                    if dtv > 0:
-                        gs.append((pts[b][1] - pts[a][1]) / (dtv / 3600.0))
-            gs.sort()
-            slope[mn] = gs[len(gs) // 2] if gs else 0.0
-    # cap the tilt pool: momentum score normalized
-    maxslope = max((abs(slope.get(r["mint"], 0)) for r in chart[:40]), default=1.0) or 1.0
-
     rng = random.Random(RNG_SEED)
     npaths = 6000
     cand = chart[:60]
-    # per-coin: anchor probability from baseline + momentum tilt
+    # per-coin: anchor probability from last chart order
     anchor = {}
     for k in range(1, places + 1):
         anchor.setdefault(k, {})
         anchor[k][cand[k - 1]["mint"]] = anchor[k].get(cand[k - 1]["mint"], 0.0) + P_STAY
         if k > 1: anchor[k][cand[k - 2]["mint"]] = anchor[k].get(cand[k - 2]["mint"], 0.0) + P_NEI
         if k < len(cand): anchor[k][cand[k]["mint"]] = anchor[k].get(cand[k]["mint"], 0.0) + P_NEI
-    tilt = {}
-    for k in range(1, places + 1):
-        tilt[k] = {}
-        for r in cand[:30]:
-            s = slope.get(r["mint"], 0.0)
-            if s <= 0: continue
-            w = (s / maxslope) ** 2
-            tilt[k][r["mint"]] = tilt[k].get(r["mint"], 0.0) + w
-    # simulate: each path draws per-coin logcap noise; mix anchor & tilt ranks
+    # simulate: each path draws per-coin logcap noise; mix anchor & simulated ranks
     place_counts = {p: {} for p in range(1, places + 1)}
     size_draws = {p: [] for p in range(1, places + 1)}
     paths = []
     for r in cand:
-        s = slope.get(r["mint"], 0.0)
         y = math.log10(float(r["market_cap_lamports"])) - 9.0
-        paths.append((r["mint"], y, max(min(s, 0.5), -0.5)))
+        paths.append((r["mint"], y))
     for read_t in reads:
         h = max((read_t - t_last) / 3600.0, 0.02)
         for _ in range(npaths):
             vals = []
-            for mn, y, s in paths:
-                # diffusion: hourly sd ~0.35 (chart churn), drift capped
-                sd = SIZE_SD * math.sqrt(h)
-                vals.append((y + s * h + rng.gauss(0.0, sd), mn))
+            sd_h = SIZE_SD * math.sqrt(h)
+            for mn, y in paths:
+                vals.append((y + rng.gauss(0.0, sd_h), mn))
             vals.sort(reverse=True)
-            # probability mix: with prob (1-TILT) follow simulated ranks, else tilt-weighted sample
-            if rng.random() < (1.0 - TILT):
-                for p in range(1, places + 1):
-                    mn = vals[p - 1][1]
-                    place_counts[p][mn] = place_counts[p].get(mn, 0) + 1
-                    size_draws[p].append(vals[p - 1][0])
-            else:
-                for p in range(1, places + 1):
-                    w = tilt[p]
-                    tot = sum(w.values()) or 1.0
-                    x = rng.random() * tot
-                    acc = 0.0; pick = vals[p - 1][1]
-                    for mn, wt in w.items():
-                        acc += wt
-                        if x <= acc:
-                            pick = mn; break
-                    place_counts[p][pick] = place_counts[p].get(pick, 0) + 1
-                    cap = next((y for mn2, y, s2 in paths if mn2 == pick), 3.0)
-                    size_draws[p].append(cap)
+            for p in range(1, places + 1):
+                mn = vals[p - 1][1]
+                place_counts[p][mn] = place_counts[p].get(mn, 0) + 1
+                size_draws[p].append(vals[p - 1][0])
 
     probabilities = []
     for p in range(1, places + 1):
