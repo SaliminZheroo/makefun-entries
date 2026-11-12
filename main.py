@@ -71,14 +71,14 @@ def main():
         # blend simulation counts with the analytic anchor (anchor keeps floor)
         blended = {}
         for mn, c in place_counts[p].items():
-            blended[mn] = blended.get(mn, 0.0) + (c / tot) * (1.0 - 0.25)
+            blended[mn] = blended.get(mn, 0.0) + (c / tot) * (1.0 - 0.35)
         for mn, a in anchor[p].items():
-            blended[mn] = blended.get(mn, 0.0) + a * 0.25
+            blended[mn] = blended.get(mn, 0.0) + a * 0.35
         rows = sorted(blended.items(), key=lambda kv: -kv[1])
         acc = 0.0
         for mn, q in rows:
-            if acc >= 0.95: break
-            qq = min(q, 0.95 - acc)
+            if acc >= 0.97: break
+            qq = min(q, 0.97 - acc)
             if qq <= 0: break
             probabilities.append({"mint": mn, "place": p, "p": round(qq, 6)})
             acc += qq
