@@ -71,9 +71,9 @@ def main():
         # blend simulation counts with the analytic anchor (anchor keeps floor)
         blended = {}
         for mn, c in place_counts[p].items():
-            blended[mn] = blended.get(mn, 0.0) + (c / tot) * (1.0 - 0.45)
+            blended[mn] = blended.get(mn, 0.0) + (c / tot) * (1.0 - 0.55)
         for mn, a in anchor[p].items():
-            blended[mn] = blended.get(mn, 0.0) + a * 0.45
+            blended[mn] = blended.get(mn, 0.0) + a * 0.55
         rows = sorted(blended.items(), key=lambda kv: -kv[1])
         acc = 0.0
         for mn, q in rows:
