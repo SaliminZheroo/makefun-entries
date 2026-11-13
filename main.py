@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: MIT
+# tiny-chess-01 entry: sunfish-2026 core, MTD-bi, node budget 40000 (deterministic)
 import base64,lzma,struct,sys,os,json,urllib.request as u
 from collections import namedtuple
 from itertools import count
@@ -18,6 +19,7 @@ def f2p(f):
  e=B+B+''.join(' '+''.join('.'*int(c) if c.isdigit() else c for c in r)+'\n' for r in p[0].split('/'))
  o=P(e+B+B,0,('Q' in p[2],'K' in p[2]),('k' in p[2],'q' in p[2]),0 if p[3]=='-'else 91+ord(p[3][0])-97-10*(int(p[3][1])-1),0)
  return o.rt() if p[1]=='b' else o
+# moves: queen promotions only (size cap); engine plays legal queen promos
 def ch(f,L):
  s=N();b=None
  try:
